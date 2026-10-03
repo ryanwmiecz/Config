@@ -1,22 +1,69 @@
 return {
-    "nvim-treesitter/nvim-treesitter",
-    branch = "main",
-    lazy = false, -- the main branch doesn't support lazy loading
-    build = ":TSUpdate",
-    config = function()
-        require("nvim-treesitter").install({
-            "c_sharp", "lua", "json", "xml", "html", "css",
-            "javascript", "typescript", "yaml", "markdown", "bash",
-        })
+    {
+        "hrsh7th/nvim-cmp",
+        event = "InsertEnter",
+        dependencies = {
+            "hrsh7th/cmp-nvim-lsp",
+            "saadparwaiz1/cmp_luasnip",
+            "L3MON4D3/LuaSnip",
+            "rafamadriz/friendly-snippets",
+            "windwp/nvim-autopairs",
+        },
+        config = function()
+            local cmp = require("cmp")
+            local luasnip = require("luasnip")
 
-        vim.api.nvim_create_autocmd("FileType", {
-            callback = function(args)
-                -- start() errors if there's no parser for this filetype, so pcall it
-                local ok = pcall(vim.treesitter.start, args.buf)
-                if ok then
-                    vim.bo[args.buf].indentexpr = "v:lua.require'nvim-treesitter'.indentexpr()"
-                end
-            end,
-        })
-    end,
+            require("luasnip.loaders.from_vscode").lazy_load()
+
+            cmp.setup({
+                snippet = {
+                    expand = function(args)
+                        luasnip.lsp_expand(args.body)
+                    end,
+                },
+
+                mapping = cmp.mapping.preset.insert({
+                    ["<C-Space>"] = cmp.mapping.complete(),
+                    ["<CR>"] = cmp.mapping.confirm({ select = true }),
+
+                    ["<Tab>"] = cmp.mapping(function(fallback)
+                        if cmp.visible() then
+                            cmp.select_next_item()
+                        elseif luasnip.expand_or_jumpable() then
+                            luasnip.expand_or_jump()
+                        else
+                            fallback()
+                        end
+                    end, { "i", "s" }),
+
+                    ["<S-Tab>"] = cmp.mapping(function(fallback)
+                        if cmp.visible() then
+                            cmp.select_prev_item()
+                        elseif luasnip.jumpable(-1) then
+                            luasnip.jump(-1)
+                        else
+                            fallback()
+                        end
+                    end, { "i", "s" }),
+                }),
+
+                sources = cmp.config.sources({
+                    { name = "nvim_lsp" },
+                    { name = "luasnip" },
+                }),
+            })
+
+            -- Add the closing bracket after confirming a function completion
+            local cmp_autopairs = require("nvim-autopairs.completion.cmp")
+            cmp.event:on("confirm_done", cmp_autopairs.on_confirm_done())
+        end,
+    },
+
+    {
+        "windwp/nvim-autopairs",
+        event = "InsertEnter",
+        config = function()
+            require("nvim-autopairs").setup({})
+        end,
+    },
 }
